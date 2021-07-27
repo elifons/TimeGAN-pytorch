@@ -6,6 +6,29 @@ import matplotlib.pyplot as plt
 from torch.utils.data import TensorDataset, DataLoader
 from utils.data_utils import MinMaxScaler
 from utils.models import *
+import numpy as np
+
+def random_generator (batch_size, z_dim, max_seq_len):
+    """Random vector generation.
+
+    Args:
+    - batch_size: size of the random vector
+    - z_dim: dimension of random vector
+    - T_mb: time information for the random vector
+    - max_seq_len: maximum sequence length
+
+    Returns:
+    - Z_mb: generated random vector
+    """
+    T_mb = list(max_seq_len for i in range(batch_size))
+    Z_mb = list()
+    for i in range(batch_size):
+        temp = np.zeros([max_seq_len, z_dim])
+        temp_Z = np.random.uniform(0., 1, [T_mb[i], z_dim])
+        temp[:T_mb[i],:] = temp_Z
+        Z_mb.append(temp_Z)
+    return Z_mb
+
 
 
 def timegan(ori_data, parameters):
@@ -26,6 +49,10 @@ def timegan(ori_data, parameters):
     else:
         device = torch.device("cpu")
 
+     # Normalize data and create dataloader
+    no, seq_len, dim = np.asarray(ori_data).shape
+    ori_data, min_val, max_val = MinMaxScaler(ori_data)
+
 
     # timegan parameters
     hidden_dim   = parameters['hidden_dim']
@@ -36,9 +63,6 @@ def timegan(ori_data, parameters):
     gamma        = 1
 
 
-    # Normalize data and create dataloader
-    no, seq_len, dim = np.asarray(ori_data).shape
-    ori_data, min_val, max_val = MinMaxScaler(ori_data)
     train_loader = DataLoader(torch.from_numpy(ori_data).float(), shuffle=True, batch_size=batch_size, drop_last=True)
 
 
@@ -74,9 +98,8 @@ def timegan(ori_data, parameters):
     MSEloss = nn.MSELoss()
 
     # 1. Train Embedding network
-    E0_optimizer = optim.Adam(params_e_r)
     params_e_r = list(embedder.parameters()) + list(recovery.parameters())
-
+    E0_optimizer = optim.Adam(params_e_r)
 
     step_e_loss = []
     for epoch in range(num_epochs):
@@ -132,7 +155,7 @@ def timegan(ori_data, parameters):
                 E_optimizer.zero_grad()
 
                 X = X.to(device)
-                Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
+                Z_mb = random_generator(batch_size, z_dim, seq_len)
                 Z_mb = torch.from_numpy(np.array(Z_mb)).float()
                 E_hat = generator(Z_mb)
                 H_hat = supervisor(E_hat)
@@ -175,7 +198,7 @@ def timegan(ori_data, parameters):
             
         # Train discriminator
         for X in train_loader:
-            Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
+            Z_mb = random_generator(batch_size, z_dim, T_mb, seq_len)
             Z_mb = torch.from_numpy(np.array(Z_mb)).float()
             D_optimizer.zero_grad()
 
@@ -213,7 +236,8 @@ def timegan(ori_data, parameters):
     supervisor.eval()
     recovery.eval()
 
-    Z_mb = random_generator(no, z_dim, ori_time, max_seq_len)
+    # Z_mb = random_generator(no, z_dim, ori_time, seq_len)
+    Z_mb = random_generator(no, z_dim, ori_time, seq_len)
     Z_mb = torch.from_numpy(np.array(Z_mb)).float().to(device)
     E_hat = generator(Z_mb)
     H_hat = supervisor(E_hat)
