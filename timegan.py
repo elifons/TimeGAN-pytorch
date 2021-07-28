@@ -7,6 +7,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from utils.data_utils import MinMaxScaler
 from utils.models import *
 import numpy as np
+import os
 
 def random_generator (batch_size, z_dim, max_seq_len):
     """Random vector generation.
@@ -30,6 +31,12 @@ def random_generator (batch_size, z_dim, max_seq_len):
     return Z_mb
 
 
+def create_directory_(dir_):
+    try:
+        os.makedirs(dir_)
+    except FileExistsError:
+        pass
+    return dir_
 
 def timegan(ori_data, parameters):
     """Train TimeGAN and generates new data. 
@@ -59,10 +66,11 @@ def timegan(ori_data, parameters):
     num_layers   = parameters['num_layer']
     num_epochs   = parameters['num_epochs']
     batch_size   = parameters['batch_size']
+    path         = parameters['dest']
     z_dim        = dim
     gamma        = 1
 
-
+    create_directory_(path)
     train_loader = DataLoader(torch.from_numpy(ori_data).float(), shuffle=True, batch_size=batch_size, drop_last=True)
 
 
@@ -98,6 +106,7 @@ def timegan(ori_data, parameters):
     MSEloss = nn.MSELoss()
 
     # 1. Train Embedding network
+    print('Start training embedding network')
     params_e_r = list(embedder.parameters()) + list(recovery.parameters())
     E0_optimizer = optim.Adam(params_e_r)
 
@@ -117,13 +126,15 @@ def timegan(ori_data, parameters):
         if epoch % 10 == 0:
             torch.save(embedder.state_dict(), 'checkpoint_embedder_'+str(epoch)+'.pt')
             torch.save(recovery.state_dict(), 'checkpoint_recovery_'+str(epoch)+'.pt')
-            print(epoch, np.round(np.sqrt(E_loss_T0.item()),4))
+            print('Epoch', epoch, np.round(np.sqrt(E_loss_T0.item()),4))
+
+    print('Finished training embedding network')
 
 
     # 2. Train with supervised loss
+    print('Start training with supervised loss')
     params_g_s = list(generator.parameters()) + list(supervisor.parameters())
     GS_optimizer = optim.Adam(params_g_s)
-
 
     step_g_loss_s = []
     for epoch in range(num_epochs):
@@ -140,9 +151,11 @@ def timegan(ori_data, parameters):
             torch.save(supervisor.state_dict(), 'checkpoint_supervisor_'+str(epoch)+'.pt')
             torch.save(generator.state_dict(), 'checkpoint_generator_'+str(epoch)+'.pt')
             print('Epoch', epoch, np.round(np.sqrt(G_loss_S.item()),4))
+    print('Finished training with supervised loss')
 
 
     # 3. Joint training
+    print('Start joint training')
     G_optimizer = optim.Adam(params_g_s)
     E_optimizer = optim.Adam(params_e_r)
     D_optimizer = optim.Adam(discriminator.parameters())
@@ -182,7 +195,7 @@ def timegan(ori_data, parameters):
 
                 # Train embedder
                 X_tilde = recovery(H)
-                E_loss_T0 = MSEloss(real_data, X_tilde)
+                E_loss_T0 = MSEloss(X, X_tilde)
                 E_loss0 = 10*torch.sqrt(E_loss_T0)
                 E_loss = E_loss0  + 0.1*G_loss_S
 
@@ -198,7 +211,7 @@ def timegan(ori_data, parameters):
             
         # Train discriminator
         for X in train_loader:
-            Z_mb = random_generator(batch_size, z_dim, T_mb, seq_len)
+            Z_mb = random_generator(batch_size, z_dim, seq_len)
             Z_mb = torch.from_numpy(np.array(Z_mb)).float()
             D_optimizer.zero_grad()
 
@@ -231,13 +244,15 @@ def timegan(ori_data, parameters):
                   'g_loss_v:', np.round(G_loss_V.item(),4), \
                   'e_loss_t0:', np.round(np.sqrt(E_loss_T0.item()),4))
 
+    print('Finished joint training')
 
     generator.eval()
     supervisor.eval()
     recovery.eval()
 
+    print('Start data generation')
     # Z_mb = random_generator(no, z_dim, ori_time, seq_len)
-    Z_mb = random_generator(no, z_dim, ori_time, seq_len)
+    Z_mb = random_generator(no, z_dim, seq_len)
     Z_mb = torch.from_numpy(np.array(Z_mb)).float().to(device)
     E_hat = generator(Z_mb)
     H_hat = supervisor(E_hat)
