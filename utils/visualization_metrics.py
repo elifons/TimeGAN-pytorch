@@ -6,8 +6,8 @@ Neural Information Processing Systems (NeurIPS), 2019.
 
 Paper link: https://papers.nips.cc/paper/8789-time-series-generative-adversarial-networks
 
-Last updated Date: April 24th 2020
 Code author: Jinsung Yoon (jsyoon0823@gmail.com)
+Minor modifications: E. Fons.
 
 -----------------------------
 
@@ -21,9 +21,10 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import numpy as np
+import os.path as op
 
    
-def visualization (ori_data, generated_data, analysis):
+def visualization (ori_data, generated_data, analysis, path):
     """Using PCA or tSNE for generated and original data visualization.
 
     Args:
@@ -75,7 +76,8 @@ def visualization (ori_data, generated_data, analysis):
         plt.title('PCA plot')
         plt.xlabel('x-pca')
         plt.ylabel('y_pca')
-        plt.show()
+        plt.savefig(op.join(path, 'pca.png'), bbox_inches='tight', dpi=300)
+        # plt.show()
 
     elif analysis == 'tsne':
         # Do t-SNE Analysis together       
@@ -98,4 +100,5 @@ def visualization (ori_data, generated_data, analysis):
         plt.title('t-SNE plot')
         plt.xlabel('x-tsne')
         plt.ylabel('y_tsne')
-        plt.show()    
+        plt.savefig(op.join(path, 'tsne.png'), bbox_inches='tight', dpi=300)
+        # plt.show()    

@@ -27,7 +27,8 @@ def main (args):
     parameters['dest'] = args.dest
       
     generated_data = timegan(ori_data, parameters)   
-    import pdb; pdb.set_trace() 
+    visualization(ori_data, generated_data, 'pca', args.dest)
+    visualization(ori_data, generated_data, 'tsne', args.dest)
     return ori_data, generated_data
 
 
@@ -43,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_layer', default=3,type=int, help='number of layers (should be optimized)')
     parser.add_argument('--n_epochs', default=50, type=int, help='Training epochs (should be optimized)',)
     parser.add_argument('--batch_size', default=128, type=int, help='the number of samples in mini-batch (should be optimized)')  
-    parser.add_argument('--dest', default='exp_', type=str, help='experiment dir')
+    parser.add_argument('--dest', default='exp_'+date_, type=str, help='experiment dir')
     args = parser.parse_args() 
 
     # Calls main function  

@@ -8,6 +8,7 @@ from utils.data_utils import MinMaxScaler
 from utils.models import *
 import numpy as np
 import os
+import os.path as op
 
 def random_generator (batch_size, z_dim, max_seq_len):
     """Random vector generation.
@@ -124,8 +125,8 @@ def timegan(ori_data, parameters):
             E0_optimizer.step()
             step_e_loss.append(E_loss_T0.item())
         if epoch % 10 == 0:
-            torch.save(embedder.state_dict(), 'checkpoint_embedder_'+str(epoch)+'.pt')
-            torch.save(recovery.state_dict(), 'checkpoint_recovery_'+str(epoch)+'.pt')
+            torch.save(embedder.state_dict(), op.join(path, 'checkpoint_embedder_'+str(epoch)+'.pt'))
+            torch.save(recovery.state_dict(), op.join(path,'checkpoint_recovery_'+str(epoch)+'.pt'))
             print('Epoch', epoch, np.round(np.sqrt(E_loss_T0.item()),4))
 
     print('Finished training embedding network')
@@ -148,8 +149,8 @@ def timegan(ori_data, parameters):
             GS_optimizer.step()
             step_g_loss_s.append(G_loss_S.item())
         if epoch % 10 == 0:
-            torch.save(supervisor.state_dict(), 'checkpoint_supervisor_'+str(epoch)+'.pt')
-            torch.save(generator.state_dict(), 'checkpoint_generator_'+str(epoch)+'.pt')
+            torch.save(supervisor.state_dict(), op.join(path, 'checkpoint_supervisor_'+str(epoch)+'.pt'))
+            torch.save(generator.state_dict(), op.join(path, 'checkpoint_generator_'+str(epoch)+'.pt'))
             print('Epoch', epoch, np.round(np.sqrt(G_loss_S.item()),4))
     print('Finished training with supervised loss')
 
@@ -166,10 +167,11 @@ def timegan(ori_data, parameters):
             for X in train_loader:
                 G_optimizer.zero_grad()
                 E_optimizer.zero_grad()
+                D_optimizer.zero_grad()
 
                 X = X.to(device)
                 Z_mb = random_generator(batch_size, z_dim, seq_len)
-                Z_mb = torch.from_numpy(np.array(Z_mb)).float()
+                Z_mb = torch.from_numpy(np.array(Z_mb)).float().to(device)
                 E_hat = generator(Z_mb)
                 H_hat = supervisor(E_hat)
                 X_hat = recovery(H_hat)
@@ -192,7 +194,6 @@ def timegan(ori_data, parameters):
                 
                 G_loss.backward(retain_graph=True)
 
-
                 # Train embedder
                 X_tilde = recovery(H)
                 E_loss_T0 = MSEloss(X, X_tilde)
@@ -203,20 +204,24 @@ def timegan(ori_data, parameters):
         
                 G_optimizer.step()
                 E_optimizer.step()
-                step_g_loss_u.append(G_loss_U)
-                step_g_loss_s.append(G_loss_S)
-                step_g_loss_v.append(G_loss_V)
-                step_e_loss_t0.append(E_loss_T0)
-
-            
+                step_g_loss_u.append(G_loss_U.item())
+                step_g_loss_s.append(G_loss_S.item())
+                step_g_loss_v.append(G_loss_V.item())
+                step_e_loss_t0.append(E_loss_T0.item())
+  
         # Train discriminator
         for X in train_loader:
             Z_mb = random_generator(batch_size, z_dim, seq_len)
-            Z_mb = torch.from_numpy(np.array(Z_mb)).float()
+            Z_mb = torch.from_numpy(np.array(Z_mb)).float().to(device)
+            G_optimizer.zero_grad()
+
+            E_optimizer.zero_grad()
             D_optimizer.zero_grad()
 
             X = X.to(device)            
+            # import pdb; pdb.set_trace() 
             H = embedder(X)
+            # import pdb; pdb.set_trace() 
             E_hat = generator(Z_mb).detach()
             H_hat = supervisor(E_hat)
             Y_real = discriminator(H)
@@ -231,14 +236,14 @@ def timegan(ori_data, parameters):
             if D_loss > 0.15:        
                 D_loss.backward()
                 D_optimizer.step()
-            step_d_loss.append(D_loss)
+            step_d_loss.append(D_loss.item())
 
         if epoch % 10 == 0:
-            torch.save(supervisor.state_dict(), 'checkpoint_supervisor_'+str(epoch)+'.pt')
-            torch.save(generator.state_dict(), 'checkpoint_generator_'+str(epoch)+'.pt')
-            torch.save(embedder.state_dict(), 'checkpoint_embedder_'+str(epoch)+'.pt')
-            torch.save(recovery.state_dict(), 'checkpoint_recovery_'+str(epoch)+'.pt')
-            torch.save(discriminator.state_dict(), 'checkpoint_discriminator_'+str(epoch)+'.pt')
+            torch.save(supervisor.state_dict(), op.join(path, 'checkpoint_supervisor_'+str(epoch)+'.pt'))
+            torch.save(generator.state_dict(), op.join(path, 'checkpoint_generator_'+str(epoch)+'.pt'))
+            torch.save(embedder.state_dict(), op.join(path, 'checkpoint_embedder_'+str(epoch)+'.pt'))
+            torch.save(recovery.state_dict(), op.join(path, 'checkpoint_recovery_'+str(epoch)+'.pt'))
+            torch.save(discriminator.state_dict(), op.join(path, 'checkpoint_discriminator_'+str(epoch)+'.pt'))
             print('Epoch:', epoch, 'd_loss:', np.round(D_loss.item(),4), 'g_loss_u:', np.round(G_loss_U.item(),4), \
                   'g_loss_s:', np.round(np.sqrt(G_loss_S.item()),4), \
                   'g_loss_v:', np.round(G_loss_V.item(),4), \
@@ -258,6 +263,7 @@ def timegan(ori_data, parameters):
     H_hat = supervisor(E_hat)
     X_hat = recovery(H_hat)
     X_hat = X_hat.detach().cpu()
+    X_hat = np.array(X_hat)
     generated_data = X_hat * max_val
     generated_data = generated_data + min_val
     

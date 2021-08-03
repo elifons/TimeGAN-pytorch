@@ -9,7 +9,7 @@ Pytorch implementation of [TimeGAN](https://papers.nips.cc/paper/2019/hash/c9efe
 
 Yoon, J., Jarrett, D., & Schaar, M. (2019). Time-series Generative Adversarial Networks. In Advances in Neural Information Processing Systems. 
 
-Official TimeGAN tensorflow implementation: https://github.com/hfawaz/InceptionTime
+Official TimeGAN tensorflow implementation: https://github.com/jsyoon0823/TimeGAN
 
 
 
